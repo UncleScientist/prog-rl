@@ -1,7 +1,7 @@
 use bracket_lib::prelude::*;
 
-embedded_resource!(WIDE_FONT, "resources/terminal_10x16.png");
-embedded_resource!(VGA_FONT, "resources/vga8x16.png");
+embedded_resource!(WIDE_FONT, "../resources/terminal_10x16.png");
+embedded_resource!(VGA_FONT, "../resources/vga8x16.png");
 
 struct State {}
 impl GameState for State {
@@ -12,10 +12,11 @@ impl GameState for State {
 }
 
 fn main() -> BError {
-    link_resource!(WIDE_FONT, "resources/terminal_10x16.png");
-    link_resource!(VGA_FONT, "resources/vga8x16.png");
+    link_resource!(WIDE_FONT, "../resources/terminal_10x16.png");
+    link_resource!(VGA_FONT, "../resources/vga8x16.png");
 
     let context = BTermBuilder::new()
+        .with_resource_path("../resources")
         .with_simple_console(80, 50, "terminal_10x16.png")
         .with_title("Roguelike Tutorial")
         .with_font("terminal_10x16.png", 10, 16)
