@@ -8,6 +8,8 @@ edition = "2021"
 [dependencies]
 getrandom = { version = "0.2", features = ["js"] }
 bracket-lib = "0.8.1"
+specs = "0.17.0"
+specs-derive = "0.4.1"
 
 [profile.release]
 incremental = true
