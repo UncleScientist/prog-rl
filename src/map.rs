@@ -1,4 +1,4 @@
-use specs::prelude::*;
+use bevy_ecs::prelude::*;
 
 use bracket_lib::prelude::*;
 
@@ -20,7 +20,7 @@ impl Map {
     pub fn generate(ecs: &mut World, width: i32, height: i32) -> Self {
         let mut rooms = Vec::new();
 
-        let rng = ecs.get_mut::<RandomNumberGenerator>().unwrap();
+        let mut rng = ecs.get_resource_mut::<RandomNumberGenerator>().unwrap();
 
         'next: while rooms.len() < ROOM_COUNT {
             let x1 = rng.range(0, width - MAX_WIDTH);

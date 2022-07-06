@@ -1,13 +1,10 @@
 use std::fmt::Display;
 
-use specs::prelude::*;
+use bevy_ecs::prelude::*;
 
 use bracket_lib::prelude::*;
 
-mod components;
 mod map;
-
-use components::*;
 use map::*;
 
 embedded_resource!(WIDE_FONT, "../resources/terminal_10x16.png");
@@ -36,7 +33,7 @@ impl GameState for State {
 
         match self.display {
             RunState::WelcomeScreen => {
-                self.center_at_row(ctx, 2, "Welcome to the Prog-Rog");
+                self.center_at_row(ctx, 2, "Welcome to \"Prog-Rog\"");
                 self.center_at_row(ctx, 3, "A Programmable Roguelike");
 
                 self.center_at_row(ctx, 5, "Press ENTER to Start");
@@ -46,37 +43,39 @@ impl GameState for State {
             }
 
             RunState::StartGame => {
+                let cell = self.ecs.cell();
+
                 ctx.print(0, 0, format!("{}", ctx.fps));
 
-                let map = self.ecs.fetch::<Map>();
-                let vp = self.ecs.fetch::<Viewport>();
+                let map = &*cell.get_resource::<Map>().unwrap();
+                let vp = &*cell.get_resource::<Viewport>().unwrap();
                 {
-                    let p = self.ecs.fetch::<MapOffset>();
-                    map.draw(ctx, p.x, p.y, &vp);
+                    let p = &*cell.get_resource::<MapOffset>().unwrap();
+                    map.draw(ctx, p.x, p.y, vp);
                 }
 
                 if let Some(key) = ctx.key {
                     match key {
                         VirtualKeyCode::Right => {
-                            let mut mo = self.ecs.fetch_mut::<MapOffset>();
+                            let mut mo = cell.get_resource_mut::<MapOffset>().unwrap();
                             if mo.x + vp.x2 - vp.x1 < map.width {
                                 mo.x += 1;
                             }
                         }
                         VirtualKeyCode::Left => {
-                            let mut mo = self.ecs.fetch_mut::<MapOffset>();
+                            let mut mo = cell.get_resource_mut::<MapOffset>().unwrap();
                             if mo.x > 0 {
                                 mo.x -= 1;
                             }
                         }
                         VirtualKeyCode::Down => {
-                            let mut mo = self.ecs.fetch_mut::<MapOffset>();
+                            let mut mo = cell.get_resource_mut::<MapOffset>().unwrap();
                             if mo.y + vp.y2 - vp.y1 < map.height {
                                 mo.y += 1;
                             }
                         }
                         VirtualKeyCode::Up => {
-                            let mut mo = self.ecs.fetch_mut::<MapOffset>();
+                            let mut mo = cell.get_resource_mut::<MapOffset>().unwrap();
                             if mo.y > 0 {
                                 mo.y -= 1;
                             }
@@ -85,7 +84,7 @@ impl GameState for State {
                     }
                 }
 
-                let mo = self.ecs.fetch::<MapOffset>();
+                let mo = &*cell.get_resource::<MapOffset>().unwrap();
                 ctx.print(5, 0, format!("{},{}", mo.x, mo.y));
             }
         }
@@ -118,14 +117,12 @@ fn main() -> BError {
         display: RunState::WelcomeScreen,
     };
 
-    register_components(&mut gs.ecs);
-
-    gs.ecs.insert(RandomNumberGenerator::new());
-    gs.ecs.insert(Viewport::with_size(1, 1, 38, 23));
-    gs.ecs.insert(MapOffset::new(0, 0));
+    gs.ecs.insert_resource(RandomNumberGenerator::new());
+    gs.ecs.insert_resource(Viewport::with_size(1, 1, 38, 23));
+    gs.ecs.insert_resource(MapOffset::new(0, 0));
 
     let map = Map::generate(&mut gs.ecs, WIDTH * 5, HEIGHT * 5);
-    gs.ecs.insert(map);
+    gs.ecs.insert_resource(map);
 
     main_loop(context, gs)
 }
