@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use bevy_ecs::event::Events;
 use bevy_ecs::prelude::*;
 
 use bracket_lib::prelude::*;
@@ -25,10 +26,12 @@ pub enum RunState {
 struct State {
     ecs: World,
     display: RunState,
+    schedule: Schedule,
 }
 
 impl GameState for State {
     fn tick(&mut self, ctx: &mut BTerm) {
+        self.schedule.run(&mut self.ecs);
         ctx.cls();
 
         match self.display {
@@ -43,49 +46,23 @@ impl GameState for State {
             }
 
             RunState::StartGame => {
+                if let Some(key) = ctx.key {
+                    let mut events = self
+                        .ecs
+                        .get_resource_mut::<Events<KeyboardEvent>>()
+                        .unwrap();
+                    events.send(KeyboardEvent(key));
+                }
+
+                ctx.print(0, HEIGHT - 1, format!("FPS: {}", ctx.fps));
+
                 let cell = self.ecs.cell();
-
-                ctx.print(0, 0, format!("{}", ctx.fps));
-
                 let map = &*cell.get_resource::<Map>().unwrap();
                 let vp = &*cell.get_resource::<Viewport>().unwrap();
                 {
                     let p = &*cell.get_resource::<MapOffset>().unwrap();
                     map.draw(ctx, p.x, p.y, vp);
                 }
-
-                if let Some(key) = ctx.key {
-                    match key {
-                        VirtualKeyCode::Right => {
-                            let mut mo = cell.get_resource_mut::<MapOffset>().unwrap();
-                            if mo.x + vp.x2 - vp.x1 < map.width {
-                                mo.x += 1;
-                            }
-                        }
-                        VirtualKeyCode::Left => {
-                            let mut mo = cell.get_resource_mut::<MapOffset>().unwrap();
-                            if mo.x > 0 {
-                                mo.x -= 1;
-                            }
-                        }
-                        VirtualKeyCode::Down => {
-                            let mut mo = cell.get_resource_mut::<MapOffset>().unwrap();
-                            if mo.y + vp.y2 - vp.y1 < map.height {
-                                mo.y += 1;
-                            }
-                        }
-                        VirtualKeyCode::Up => {
-                            let mut mo = cell.get_resource_mut::<MapOffset>().unwrap();
-                            if mo.y > 0 {
-                                mo.y -= 1;
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-
-                let mo = &*cell.get_resource::<MapOffset>().unwrap();
-                ctx.print(5, 0, format!("{},{}", mo.x, mo.y));
             }
         }
     }
@@ -112,11 +89,20 @@ fn main() -> BError {
         .with_fps_cap(10.0)
         .build()?;
 
+    let schedule = Schedule::default()
+        .with_stage(
+            "clear",
+            SystemStage::parallel().with_system(Events::<KeyboardEvent>::update_system),
+        )
+        .with_stage("update", SystemStage::parallel().with_system(handle_key));
+
     let mut gs = State {
         ecs: World::new(),
         display: RunState::WelcomeScreen,
+        schedule,
     };
 
+    gs.ecs.init_resource::<Events<KeyboardEvent>>();
     gs.ecs.insert_resource(RandomNumberGenerator::new());
     gs.ecs.insert_resource(Viewport::with_size(1, 1, 38, 23));
     gs.ecs.insert_resource(MapOffset::new(0, 0));
@@ -125,4 +111,39 @@ fn main() -> BError {
     gs.ecs.insert_resource(map);
 
     main_loop(context, gs)
+}
+
+struct KeyboardEvent(VirtualKeyCode);
+
+fn handle_key(
+    mut reader: EventReader<KeyboardEvent>,
+    map: Res<Map>,
+    vp: Res<Viewport>,
+    mut mo: ResMut<MapOffset>,
+) {
+    for event in reader.iter() {
+        match event.0 {
+            VirtualKeyCode::Right => {
+                if mo.x + vp.x2 - vp.x1 < map.width {
+                    mo.x += 1;
+                }
+            }
+            VirtualKeyCode::Left => {
+                if mo.x > 0 {
+                    mo.x -= 1;
+                }
+            }
+            VirtualKeyCode::Down => {
+                if mo.y + vp.y2 - vp.y1 < map.height {
+                    mo.y += 1;
+                }
+            }
+            VirtualKeyCode::Up => {
+                if mo.y > 0 {
+                    mo.y -= 1;
+                }
+            }
+            _ => {}
+        }
+    }
 }
