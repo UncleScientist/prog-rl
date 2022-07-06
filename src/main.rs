@@ -32,8 +32,8 @@ struct State {
 impl GameState for State {
     fn tick(&mut self, ctx: &mut BTerm) {
         self.schedule.run(&mut self.ecs);
-        ctx.cls();
 
+        ctx.cls();
         match self.display {
             RunState::WelcomeScreen => {
                 self.center_at_row(ctx, 2, "Welcome to \"Prog-Rog\"");
@@ -59,10 +59,8 @@ impl GameState for State {
                 let cell = self.ecs.cell();
                 let map = &*cell.get_resource::<Map>().unwrap();
                 let vp = &*cell.get_resource::<Viewport>().unwrap();
-                {
-                    let p = &*cell.get_resource::<MapOffset>().unwrap();
-                    map.draw(ctx, p.x, p.y, vp);
-                }
+                let p = &*cell.get_resource::<MapOffset>().unwrap();
+                map.draw(ctx, p.x, p.y, vp);
             }
         }
     }
@@ -106,6 +104,7 @@ fn main() -> BError {
     gs.ecs.insert_resource(RandomNumberGenerator::new());
     gs.ecs.insert_resource(Viewport::with_size(1, 1, 38, 23));
     gs.ecs.insert_resource(MapOffset::new(0, 0));
+    // gs.ecs.insert_resource(context);
 
     let map = Map::generate(&mut gs.ecs, WIDTH * 5, HEIGHT * 5);
     gs.ecs.insert_resource(map);
