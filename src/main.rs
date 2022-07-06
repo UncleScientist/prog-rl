@@ -102,11 +102,11 @@ fn main() -> BError {
 
     gs.ecs.init_resource::<Events<KeyboardEvent>>();
     gs.ecs.insert_resource(RandomNumberGenerator::new());
-    gs.ecs.insert_resource(Viewport::with_size(1, 1, 38, 23));
+    gs.ecs.insert_resource(Viewport::with_size(1, 1, 37, 22));
     gs.ecs.insert_resource(MapOffset::new(0, 0));
     // gs.ecs.insert_resource(context);
 
-    let map = Map::generate(&mut gs.ecs, WIDTH * 5, HEIGHT * 5);
+    let map = MapGenerator::generate(&mut gs.ecs, WIDTH * 5, HEIGHT * 5);
     gs.ecs.insert_resource(map);
 
     main_loop(context, gs)

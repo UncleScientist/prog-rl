@@ -3,10 +3,16 @@ use bevy_ecs::prelude::*;
 use bracket_lib::prelude::*;
 
 pub struct Map {
+    pub tiles: Vec<bool>,
     pub width: i32,
     pub height: i32,
+}
 
-    rooms: Vec<Rect>,
+pub struct MapGenerator {
+    pub _width: i32,
+    pub _height: i32,
+
+    _rooms: Vec<Rect>,
 }
 
 const MIN_WIDTH: i32 = 3;
@@ -16,8 +22,8 @@ const MAX_HEIGHT: i32 = 12;
 
 const ROOM_COUNT: usize = 20;
 
-impl Map {
-    pub fn generate(ecs: &mut World, width: i32, height: i32) -> Self {
+impl MapGenerator {
+    pub fn generate(ecs: &mut World, width: i32, height: i32) -> Map {
         let mut rooms = Vec::new();
 
         let mut rng = ecs.get_resource_mut::<RandomNumberGenerator>().unwrap();
@@ -39,38 +45,35 @@ impl Map {
             rooms.push(new_r);
         }
 
+        let mut map = Map::new(width, height);
+
+        for room in rooms {
+            room.for_each(|point| map.tiles[(point.x + point.y * width) as usize] = true);
+        }
+
+        map
+    }
+}
+
+impl Map {
+    pub fn new(width: i32, height: i32) -> Self {
         Self {
+            tiles: vec![false; (width * height) as usize],
             width,
             height,
-            rooms,
         }
     }
 
     // start_x, start_y: upper left corner of map
     // viewport: where to draw on the screen
     pub fn draw(&self, ctx: &mut BTerm, start_x: i32, start_y: i32, viewport: &Rect) {
-        for (e, room) in self.rooms.iter().enumerate() {
-            let offset = Rect::with_exact(
-                room.x1 - start_x,
-                room.y1 - start_y,
-                room.x2 - start_x,
-                room.y2 - start_y,
-            );
-
-            if !offset.intersect(viewport) {
-                continue;
+        viewport.for_each(|point| {
+            let map_x = point.x - viewport.x1 + start_x;
+            let map_y = point.y - viewport.y1 + start_y;
+            let idx = map_x + map_y * self.width;
+            if self.tiles[idx as usize] {
+                ctx.print(point.x, point.y, ".");
             }
-
-            let top_row = offset.y1.max(viewport.y1);
-            let bot_row = offset.y2.min(viewport.y2);
-
-            let left_col = offset.x1.max(viewport.x1);
-            let right_col = offset.x2.min(viewport.x2);
-
-            for row in top_row..bot_row {
-                ctx.print(left_col, row, ".".repeat((right_col - left_col) as usize));
-            }
-            ctx.print(left_col, top_row, &format!("{e}"));
-        }
+        });
     }
 }
