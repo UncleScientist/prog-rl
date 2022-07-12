@@ -2,6 +2,7 @@ use std::fmt::Display;
 
 use bevy_ecs::event::Events;
 use bevy_ecs::prelude::*;
+use bevy_ecs::schedule::ShouldRun;
 
 use bracket_lib::prelude::*;
 
@@ -71,9 +72,53 @@ impl GameState for State {
 
                 let map = self.ecs.get_resource::<Map>().unwrap();
                 map.draw(ctx, &offset, vp);
+
+                let drawables = self.ecs.get_resource::<DrawList>().unwrap();
+                for d in &drawables.items {
+                    let point = Point {
+                        x: d.x - offset.x + vp.x1,
+                        y: d.y - offset.y + vp.y1,
+                    };
+                    if vp.point_in_rect(point) {
+                        ctx.print(point.x, point.y, d.appearance);
+                    }
+                }
+
                 ctx.print(p.x - offset.x + vp.x1, p.y - offset.y + vp.y1, '@');
             }
         }
+    }
+}
+
+struct DrawList {
+    items: Vec<Drawable>,
+}
+
+struct Drawable {
+    x: i32,
+    y: i32,
+    appearance: char,
+}
+
+impl Drawable {
+    pub fn new(pos: &Position, mob: &Mob) -> Self {
+        Self {
+            x: pos.x,
+            y: pos.y,
+            appearance: mob.appearance,
+        }
+    }
+}
+
+struct RunSystems {
+    run_systems: bool,
+}
+
+fn run_if_player_performed_an_action(rs: Res<RunSystems>) -> ShouldRun {
+    if rs.run_systems {
+        ShouldRun::Yes
+    } else {
+        ShouldRun::No
     }
 }
 
@@ -103,7 +148,14 @@ fn main() -> BError {
             "clear",
             SystemStage::parallel().with_system(Events::<KeyboardEvent>::update_system),
         )
-        .with_stage("update", SystemStage::parallel().with_system(handle_key));
+        .with_stage("player", SystemStage::parallel().with_system(handle_key))
+        .with_stage(
+            "update",
+            SystemStage::parallel()
+                .with_run_criteria(run_if_player_performed_an_action)
+                .with_system(move_mobs)
+                .with_system(draw_mobs),
+        );
 
     let mut gs = State {
         ecs: World::new(),
@@ -114,9 +166,27 @@ fn main() -> BError {
     gs.ecs.init_resource::<Events<KeyboardEvent>>();
     gs.ecs.insert_resource(RandomNumberGenerator::new());
     gs.ecs.insert_resource(Viewport::with_size(1, 1, 37, 22));
+    gs.ecs.insert_resource(DrawList { items: Vec::new() });
+    gs.ecs.insert_resource(RunSystems { run_systems: false });
 
     let map = MapGenerator::generate(&mut gs.ecs, WIDTH * 5, HEIGHT * 5);
     let starting_position = map.center_of();
+
+    // temporarly spawn some mobs
+    let mut count = 0;
+    let mut rng = RandomNumberGenerator::new();
+    while count < 10 {
+        let x = rng.range(0, map.width());
+        let y = rng.range(0, map.height());
+        if map.walkable(x, y) {
+            gs.ecs
+                .spawn()
+                .insert(Mob { appearance: 'r' })
+                .insert(Position { x, y });
+            count += 1;
+        }
+    }
+
     gs.ecs.insert_resource(map);
 
     let player = gs
@@ -138,34 +208,84 @@ struct KeyboardEvent(VirtualKeyCode);
 fn handle_key(
     mut reader: EventReader<KeyboardEvent>,
     map: Res<Map>,
-    // mut query: Query<(&Player, &mut Position)>,
+    mut runner: ResMut<RunSystems>,
     mut query: Query<&mut Position, With<Player>>,
 ) {
+    let mut action_performed = false;
+
     for (event, _id) in reader.iter_with_id() {
         for mut position in query.iter_mut() {
             match event.0 {
                 VirtualKeyCode::H => {
                     if map.walkable(position.x - 1, position.y) {
                         position.x -= 1;
+                        action_performed = true;
                     }
                 }
                 VirtualKeyCode::L => {
                     if map.walkable(position.x + 1, position.y) {
                         position.x += 1;
+                        action_performed = true;
                     }
                 }
                 VirtualKeyCode::J => {
                     if map.walkable(position.x, position.y + 1) {
                         position.y += 1;
+                        action_performed = true;
                     }
                 }
                 VirtualKeyCode::K => {
                     if map.walkable(position.x, position.y - 1) {
                         position.y -= 1;
+                        action_performed = true;
                     }
+                }
+                VirtualKeyCode::Space => {
+                    action_performed = true;
                 }
                 _ => {}
             }
+        }
+    }
+
+    runner.run_systems = action_performed;
+}
+
+fn draw_mobs(mut draw_list: ResMut<DrawList>, query: Query<(&Position, &Mob)>) {
+    draw_list.items.clear();
+    for (position, mob) in query.iter() {
+        draw_list.items.push(Drawable::new(position, mob));
+    }
+}
+
+fn move_mobs(
+    mut rng: ResMut<RandomNumberGenerator>,
+    map: Res<Map>,
+    mut query: Query<(&mut Position, &Mob)>,
+) {
+    for (mut position, _) in query.iter_mut() {
+        let new_pos = match rng.range(0, 4) {
+            0 => Position {
+                x: position.x - 1,
+                y: position.y,
+            },
+            1 => Position {
+                x: position.x + 1,
+                y: position.y,
+            },
+            2 => Position {
+                x: position.x,
+                y: position.y - 1,
+            },
+            3 => Position {
+                x: position.x,
+                y: position.y + 1,
+            },
+            _ => panic!("rng failure"),
+        };
+
+        if map.walkable(new_pos.x, new_pos.y) {
+            *position = new_pos;
         }
     }
 }

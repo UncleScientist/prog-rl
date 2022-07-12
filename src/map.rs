@@ -95,4 +95,11 @@ impl Map {
         let idx = x + y * self.width;
         self.tiles[idx as usize]
     }
+
+    pub fn width(&self) -> i32 {
+        self.width
+    }
+    pub fn height(&self) -> i32 {
+        self.height
+    }
 }
