@@ -5,6 +5,9 @@ use bevy_ecs::prelude::*;
 
 use bracket_lib::prelude::*;
 
+mod components;
+use components::*;
+
 mod map;
 use map::*;
 
@@ -16,7 +19,6 @@ const WIDTH: i32 = 40;
 const HEIGHT: i32 = 25;
 
 type Viewport = Rect;
-type MapOffset = Point;
 
 pub enum RunState {
     WelcomeScreen,
@@ -56,11 +58,20 @@ impl GameState for State {
 
                 ctx.print(0, HEIGHT - 1, format!("FPS: {}", ctx.fps));
 
-                let cell = self.ecs.cell();
-                let map = &*cell.get_resource::<Map>().unwrap();
-                let vp = &*cell.get_resource::<Viewport>().unwrap();
-                let p = &*cell.get_resource::<MapOffset>().unwrap();
-                map.draw(ctx, p.x, p.y, vp);
+                let vp = self.ecs.get_resource::<Viewport>().unwrap();
+                let player = self.ecs.get_resource::<Entity>().unwrap();
+                let player_ref = self.ecs.entity(*player);
+                let p = player_ref.get::<Position>().unwrap();
+                let offset = Position {
+                    x: 0.max(p.x - WIDTH / 2),
+                    y: 0.max(p.y - HEIGHT / 2),
+                };
+
+                ctx.print(20, HEIGHT - 1, format!("{}, {}", p.x, p.y));
+
+                let map = self.ecs.get_resource::<Map>().unwrap();
+                map.draw(ctx, &offset, vp);
+                ctx.print(p.x - offset.x + vp.x1, p.y - offset.y + vp.y1, '@');
             }
         }
     }
@@ -103,46 +114,58 @@ fn main() -> BError {
     gs.ecs.init_resource::<Events<KeyboardEvent>>();
     gs.ecs.insert_resource(RandomNumberGenerator::new());
     gs.ecs.insert_resource(Viewport::with_size(1, 1, 37, 22));
-    gs.ecs.insert_resource(MapOffset::new(0, 0));
-    // gs.ecs.insert_resource(context);
 
     let map = MapGenerator::generate(&mut gs.ecs, WIDTH * 5, HEIGHT * 5);
+    let starting_position = map.center_of();
     gs.ecs.insert_resource(map);
+
+    let player = gs
+        .ecs
+        .spawn()
+        .insert(Player {})
+        .insert(starting_position)
+        .id();
+    gs.ecs.insert_resource(player);
 
     main_loop(context, gs)
 }
+
+#[derive(Debug, Component)]
+struct Player;
 
 struct KeyboardEvent(VirtualKeyCode);
 
 fn handle_key(
     mut reader: EventReader<KeyboardEvent>,
     map: Res<Map>,
-    vp: Res<Viewport>,
-    mut mo: ResMut<MapOffset>,
+    // mut query: Query<(&Player, &mut Position)>,
+    mut query: Query<&mut Position, With<Player>>,
 ) {
-    for event in reader.iter() {
-        match event.0 {
-            VirtualKeyCode::Right => {
-                if mo.x + vp.x2 - vp.x1 < map.width {
-                    mo.x += 1;
+    for (event, _id) in reader.iter_with_id() {
+        for mut position in query.iter_mut() {
+            match event.0 {
+                VirtualKeyCode::H => {
+                    if map.walkable(position.x - 1, position.y) {
+                        position.x -= 1;
+                    }
                 }
-            }
-            VirtualKeyCode::Left => {
-                if mo.x > 0 {
-                    mo.x -= 1;
+                VirtualKeyCode::L => {
+                    if map.walkable(position.x + 1, position.y) {
+                        position.x += 1;
+                    }
                 }
-            }
-            VirtualKeyCode::Down => {
-                if mo.y + vp.y2 - vp.y1 < map.height {
-                    mo.y += 1;
+                VirtualKeyCode::J => {
+                    if map.walkable(position.x, position.y + 1) {
+                        position.y += 1;
+                    }
                 }
-            }
-            VirtualKeyCode::Up => {
-                if mo.y > 0 {
-                    mo.y -= 1;
+                VirtualKeyCode::K => {
+                    if map.walkable(position.x, position.y - 1) {
+                        position.y -= 1;
+                    }
                 }
+                _ => {}
             }
-            _ => {}
         }
     }
 }

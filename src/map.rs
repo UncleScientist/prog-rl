@@ -2,10 +2,14 @@ use bevy_ecs::prelude::*;
 
 use bracket_lib::prelude::*;
 
+use crate::components::*;
+
 pub struct Map {
     pub tiles: Vec<bool>,
     pub width: i32,
     pub height: i32,
+    start_x: i32,
+    start_y: i32,
 }
 
 pub struct MapGenerator {
@@ -45,7 +49,8 @@ impl MapGenerator {
             rooms.push(new_r);
         }
 
-        let mut map = Map::new(width, height);
+        let center = rooms[0].center();
+        let mut map = Map::new(width, height, center.x, center.y);
 
         for room in rooms {
             room.for_each(|point| map.tiles[(point.x + point.y * width) as usize] = true);
@@ -56,24 +61,38 @@ impl MapGenerator {
 }
 
 impl Map {
-    pub fn new(width: i32, height: i32) -> Self {
+    pub fn new(width: i32, height: i32, start_x: i32, start_y: i32) -> Self {
         Self {
             tiles: vec![false; (width * height) as usize],
             width,
             height,
+            start_x,
+            start_y,
         }
     }
 
     // start_x, start_y: upper left corner of map
     // viewport: where to draw on the screen
-    pub fn draw(&self, ctx: &mut BTerm, start_x: i32, start_y: i32, viewport: &Rect) {
+    pub fn draw(&self, ctx: &mut BTerm, offset: &Position, viewport: &Rect) {
         viewport.for_each(|point| {
-            let map_x = point.x - viewport.x1 + start_x;
-            let map_y = point.y - viewport.y1 + start_y;
+            let map_x = point.x - viewport.x1 + offset.x;
+            let map_y = point.y - viewport.y1 + offset.y;
             let idx = map_x + map_y * self.width;
             if self.tiles[idx as usize] {
                 ctx.print(point.x, point.y, ".");
             }
         });
+    }
+
+    pub fn center_of(&self) -> Position {
+        Position {
+            x: self.start_x,
+            y: self.start_y,
+        }
+    }
+
+    pub fn walkable(&self, x: i32, y: i32) -> bool {
+        let idx = x + y * self.width;
+        self.tiles[idx as usize]
     }
 }
