@@ -110,7 +110,11 @@ impl Map {
 
 impl BaseMap for Map {
     fn is_opaque(&self, idx: usize) -> bool {
-        !self.tiles[idx as usize]
+        if idx >= (self.width * self.height) as usize {
+            panic!("bug in bracket-lib");
+        } else {
+            !self.tiles[idx as usize]
+        }
     }
 }
 
