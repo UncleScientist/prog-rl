@@ -12,6 +12,9 @@ use components::*;
 mod map;
 use map::*;
 
+mod system;
+use system::*;
+
 embedded_resource!(WIDE_FONT, "../resources/terminal_10x16.png");
 embedded_resource!(VGA_FONT, "../resources/vga8x16.png");
 embedded_resource!(CHEEP_FONT, "../resources/cheepicus8x8.png");
@@ -70,9 +73,6 @@ impl GameState for State {
 
                 ctx.print(20, HEIGHT - 1, format!("{}, {}", p.x, p.y));
 
-                let map = self.ecs.get_resource::<Map>().unwrap();
-                map.draw(ctx, &offset, vp);
-
                 let drawables = self.ecs.get_resource::<DrawList>().unwrap();
                 for d in &drawables.items {
                     let point = Point {
@@ -101,11 +101,11 @@ struct Drawable {
 }
 
 impl Drawable {
-    pub fn new(pos: &Position, mob: &Mob) -> Self {
+    pub fn new(pos: &Position, appearance: char) -> Self {
         Self {
             x: pos.x,
             y: pos.y,
-            appearance: mob.appearance,
+            appearance,
         }
     }
 }
@@ -151,10 +151,16 @@ fn main() -> BError {
         .with_stage("player", SystemStage::parallel().with_system(handle_key))
         .with_stage(
             "update",
-            SystemStage::parallel()
+            SystemStage::single_threaded()
                 .with_run_criteria(run_if_player_performed_an_action)
+                .with_system(visibility_system)
                 .with_system(move_mobs)
+                .with_system(draw_map)
                 .with_system(draw_mobs),
+        )
+        .with_stage(
+            "cleanup",
+            SystemStage::parallel().with_system(clear_run_flag),
         );
 
     let mut gs = State {
@@ -167,7 +173,7 @@ fn main() -> BError {
     gs.ecs.insert_resource(RandomNumberGenerator::new());
     gs.ecs.insert_resource(Viewport::with_size(1, 1, 37, 22));
     gs.ecs.insert_resource(DrawList { items: Vec::new() });
-    gs.ecs.insert_resource(RunSystems { run_systems: false });
+    gs.ecs.insert_resource(RunSystems { run_systems: true });
 
     let map = MapGenerator::generate(&mut gs.ecs, WIDTH * 5, HEIGHT * 5);
     let starting_position = map.center_of();
@@ -194,6 +200,7 @@ fn main() -> BError {
         .spawn()
         .insert(Player {})
         .insert(starting_position)
+        .insert(Viewshed::new(5))
         .id();
     gs.ecs.insert_resource(player);
 
@@ -248,13 +255,28 @@ fn handle_key(
         }
     }
 
-    runner.run_systems = action_performed;
+    if action_performed {
+        runner.run_systems = true;
+    }
 }
 
 fn draw_mobs(mut draw_list: ResMut<DrawList>, query: Query<(&Position, &Mob)>) {
-    draw_list.items.clear();
     for (position, mob) in query.iter() {
-        draw_list.items.push(Drawable::new(position, mob));
+        draw_list
+            .items
+            .push(Drawable::new(position, mob.appearance));
+    }
+}
+
+fn draw_map(mut draw_list: ResMut<DrawList>, map: Res<Map>, query: Query<(&Player, &Viewshed)>) {
+    draw_list.items.clear();
+    for (_, viewshed) in query.iter() {
+        for point in &viewshed.visible_tiles {
+            draw_list.items.push(Drawable::new(
+                &point.into(),
+                if map.xy_is_opaque(point) { '#' } else { '.' },
+            ));
+        }
     }
 }
 
@@ -288,4 +310,8 @@ fn move_mobs(
             *position = new_pos;
         }
     }
+}
+
+fn clear_run_flag(mut rs: ResMut<RunSystems>) {
+    rs.run_systems = false;
 }

@@ -73,7 +73,7 @@ impl Map {
 
     // start_x, start_y: upper left corner of map
     // viewport: where to draw on the screen
-    pub fn draw(&self, ctx: &mut BTerm, offset: &Position, viewport: &Rect) {
+    pub fn _draw(&self, ctx: &mut BTerm, offset: &Position, viewport: &Rect) {
         viewport.for_each(|point| {
             let map_x = point.x - viewport.x1 + offset.x;
             let map_y = point.y - viewport.y1 + offset.y;
@@ -101,5 +101,21 @@ impl Map {
     }
     pub fn height(&self) -> i32 {
         self.height
+    }
+
+    pub fn xy_is_opaque(&self, p: &Point) -> bool {
+        self.is_opaque((p.x + p.y * self.width) as usize)
+    }
+}
+
+impl BaseMap for Map {
+    fn is_opaque(&self, idx: usize) -> bool {
+        !self.tiles[idx as usize]
+    }
+}
+
+impl Algorithm2D for Map {
+    fn dimensions(&self) -> Point {
+        Point::new(self.width, self.height)
     }
 }
