@@ -298,28 +298,52 @@ fn move_mobs(
     mut query: Query<(&mut Position, &Mob)>,
 ) {
     for (mut position, _) in query.iter_mut() {
-        let new_pos = match rng.range(0, 4) {
-            0 => Position {
-                x: position.x - 1,
-                y: position.y,
-            },
-            1 => Position {
-                x: position.x + 1,
-                y: position.y,
-            },
-            2 => Position {
-                x: position.x,
-                y: position.y - 1,
-            },
-            3 => Position {
-                x: position.x,
-                y: position.y + 1,
-            },
+        if let Some(new_pos) = match rng.range(0, 4) {
+            0 => {
+                if position.x > 0 {
+                    Some(Position {
+                        x: position.x - 1,
+                        y: position.y,
+                    })
+                } else {
+                    None
+                }
+            }
+            1 => {
+                if position.x < map.width - 1 {
+                    Some(Position {
+                        x: position.x + 1,
+                        y: position.y,
+                    })
+                } else {
+                    None
+                }
+            }
+            2 => {
+                if position.y > 0 {
+                    Some(Position {
+                        x: position.x,
+                        y: position.y - 1,
+                    })
+                } else {
+                    None
+                }
+            }
+            3 => {
+                if position.y < map.height - 1 {
+                    Some(Position {
+                        x: position.x,
+                        y: position.y + 1,
+                    })
+                } else {
+                    None
+                }
+            }
             _ => panic!("rng failure"),
-        };
-
-        if map.walkable(new_pos.x, new_pos.y) {
-            *position = new_pos;
+        } {
+            if map.walkable(new_pos.x, new_pos.y) {
+                *position = new_pos;
+            }
         }
     }
 }
