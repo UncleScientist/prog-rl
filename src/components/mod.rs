@@ -1,6 +1,9 @@
 use bevy_ecs::prelude::*;
 use bracket_lib::prelude::*;
 
+mod player;
+pub use player::Player;
+
 #[derive(Debug, Component)]
 pub struct Position {
     pub x: i32,

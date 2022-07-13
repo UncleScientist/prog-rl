@@ -6,6 +6,7 @@ use crate::components::*;
 
 pub struct Map {
     pub tiles: Vec<bool>,
+    pub memory: Vec<bool>,
     pub width: i32,
     pub height: i32,
     start_x: i32,
@@ -64,6 +65,7 @@ impl Map {
     pub fn new(width: i32, height: i32, start_x: i32, start_y: i32) -> Self {
         Self {
             tiles: vec![false; (width * height) as usize],
+            memory: vec![false; (width * height) as usize],
             width,
             height,
             start_x,
@@ -99,12 +101,24 @@ impl Map {
     pub fn width(&self) -> i32 {
         self.width
     }
+
     pub fn height(&self) -> i32 {
         self.height
     }
 
     pub fn xy_is_opaque(&self, p: &Point) -> bool {
         self.is_opaque((p.x + p.y * self.width) as usize)
+    }
+
+    pub fn idx_to_xy_point(&self, idx: usize) -> Point {
+        Point {
+            x: idx as i32 % self.width,
+            y: idx as i32 / self.width,
+        }
+    }
+
+    pub fn remember(&mut self, p: &Point) {
+        self.memory[(p.x + p.y * self.width) as usize] = true;
     }
 }
 

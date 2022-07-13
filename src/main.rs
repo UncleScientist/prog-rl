@@ -150,10 +150,16 @@ fn main() -> BError {
         )
         .with_stage("player", SystemStage::parallel().with_system(handle_key))
         .with_stage(
+            "viewshed",
+            SystemStage::parallel()
+                .with_run_criteria(run_if_player_performed_an_action)
+                .with_system(visibility_system)
+                .with_system(map_update_system),
+        )
+        .with_stage(
             "update",
             SystemStage::single_threaded()
                 .with_run_criteria(run_if_player_performed_an_action)
-                .with_system(visibility_system)
                 .with_system(move_mobs)
                 .with_system(draw_map)
                 .with_system(draw_mobs),
@@ -206,9 +212,6 @@ fn main() -> BError {
 
     main_loop(context, gs)
 }
-
-#[derive(Debug, Component)]
-struct Player;
 
 struct KeyboardEvent(VirtualKeyCode);
 
@@ -275,6 +278,15 @@ fn draw_map(mut draw_list: ResMut<DrawList>, map: Res<Map>, query: Query<(&Playe
             draw_list.items.push(Drawable::new(
                 &point.into(),
                 if map.xy_is_opaque(point) { '#' } else { '.' },
+            ));
+        }
+    }
+    for (e, &v) in map.memory.iter().enumerate() {
+        if v {
+            let p = map.idx_to_xy_point(e);
+            draw_list.items.push(Drawable::new(
+                &(&p).into(),
+                if map.xy_is_opaque(&p) { '#' } else { '.' },
             ));
         }
     }
