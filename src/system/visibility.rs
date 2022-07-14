@@ -31,8 +31,8 @@ pub fn visibility_system(map: Res<Map>, mut query: Query<(&mut Viewshed, &Positi
 pub fn map_update_system(mut map: ResMut<Map>, query: Query<(&Viewshed, &Player)>) {
     for q in query.iter() {
         for tile in q.0.visible_tiles.iter() {
-            if map.xy_is_opaque(&tile) {
-                map.remember(&tile);
+            if map.xy_is_opaque(tile) {
+                map.remember(tile);
             }
         }
     }

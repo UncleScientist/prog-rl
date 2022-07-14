@@ -27,5 +27,26 @@ impl From<&Point> for Position {
 
 #[derive(Debug, Component)]
 pub struct Mob {
-    pub appearance: char,
+    pub glyph: char,
+}
+
+#[derive(Debug, Component, Copy, Clone)]
+pub struct Stat {
+    pub max: i32,
+    pub cur: i32,
+}
+
+#[derive(Debug, Component, Copy, Clone)]
+pub struct Stats {
+    pub hp: Stat,
+    pub mp: Stat,
+}
+
+impl Stats {
+    pub fn new(hp: i32, mp: i32) -> Self {
+        Self {
+            hp: Stat { max: hp, cur: hp },
+            mp: Stat { max: mp, cur: mp },
+        }
+    }
 }

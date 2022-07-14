@@ -60,8 +60,6 @@ impl GameState for State {
                     events.send(KeyboardEvent(key));
                 }
 
-                ctx.print(0, HEIGHT - 1, format!("FPS: {}", ctx.fps));
-
                 let vp = self.ecs.get_resource::<Viewport>().unwrap();
                 let player = self.ecs.get_resource::<Entity>().unwrap();
                 let player_ref = self.ecs.entity(*player);
@@ -71,7 +69,12 @@ impl GameState for State {
                     y: 0.max(p.y - HEIGHT / 2),
                 };
 
-                ctx.print(20, HEIGHT - 1, format!("{}, {}", p.x, p.y));
+                let stats = player_ref.get::<Stats>().unwrap();
+                ctx.print(
+                    0,
+                    HEIGHT - 1,
+                    format!("HP:{} MP:{}", stats.hp.cur, stats.mp.cur),
+                );
 
                 let drawables = self.ecs.get_resource::<DrawList>().unwrap();
                 for d in &drawables.items {
@@ -80,7 +83,7 @@ impl GameState for State {
                         y: d.y - offset.y + vp.y1,
                     };
                     if vp.point_in_rect(point) {
-                        ctx.print(point.x, point.y, d.appearance);
+                        ctx.print(point.x, point.y, d.glyph);
                     }
                 }
 
@@ -97,15 +100,15 @@ struct DrawList {
 struct Drawable {
     x: i32,
     y: i32,
-    appearance: char,
+    glyph: char,
 }
 
 impl Drawable {
-    pub fn new(pos: &Position, appearance: char) -> Self {
+    pub fn new(pos: &Position, glyph: char) -> Self {
         Self {
             x: pos.x,
             y: pos.y,
-            appearance,
+            glyph,
         }
     }
 }
@@ -181,7 +184,7 @@ fn main() -> BError {
     gs.ecs.insert_resource(DrawList { items: Vec::new() });
     gs.ecs.insert_resource(RunSystems { run_systems: true });
 
-    let map = MapGenerator::generate(&mut gs.ecs, WIDTH * 5, HEIGHT * 5);
+    let map = MapGenerator::generate(&mut gs.ecs, WIDTH * 2, HEIGHT * 2);
     let starting_position = map.center_of();
 
     // temporarly spawn some mobs
@@ -193,7 +196,8 @@ fn main() -> BError {
         if map.walkable(x, y) {
             gs.ecs
                 .spawn()
-                .insert(Mob { appearance: 'r' })
+                .insert(Mob { glyph: 'r' })
+                .insert(Stats::new(2, 2))
                 .insert(Position { x, y });
             count += 1;
         }
@@ -207,6 +211,7 @@ fn main() -> BError {
         .insert(Player {})
         .insert(starting_position)
         .insert(Viewshed::new(5))
+        .insert(Stats::new(10, 10))
         .id();
     gs.ecs.insert_resource(player);
 
@@ -265,9 +270,7 @@ fn handle_key(
 
 fn draw_mobs(mut draw_list: ResMut<DrawList>, query: Query<(&Position, &Mob)>) {
     for (position, mob) in query.iter() {
-        draw_list
-            .items
-            .push(Drawable::new(position, mob.appearance));
+        draw_list.items.push(Drawable::new(position, mob.glyph));
     }
 }
 

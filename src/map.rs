@@ -61,7 +61,7 @@ impl MapGenerator {
 
         let mut i = rooms.iter();
         let mut prev_room = i.next().unwrap();
-        while let Some(room) = i.next() {
+        for room in i {
             let center_prev = prev_room.center();
             let center_cur = room.center();
             match rng.range(0, 2) {
