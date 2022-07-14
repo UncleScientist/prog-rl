@@ -5,12 +5,18 @@ use bracket_lib::prelude::*;
 use crate::components::*;
 
 pub struct Map {
-    pub tiles: Vec<bool>,
+    pub tiles: Vec<TileType>,
     pub memory: Vec<bool>,
     pub width: i32,
     pub height: i32,
     start_x: i32,
     start_y: i32,
+}
+
+#[derive(Copy, Clone, PartialEq)]
+pub enum TileType {
+    Floor,
+    Wall,
 }
 
 pub struct MapGenerator {
@@ -53,8 +59,36 @@ impl MapGenerator {
         let center = rooms[0].center();
         let mut map = Map::new(width, height, center.x, center.y);
 
+        let mut i = rooms.iter();
+        let mut prev_room = i.next().unwrap();
+        while let Some(room) = i.next() {
+            let center_prev = prev_room.center();
+            let center_cur = room.center();
+            match rng.range(0, 2) {
+                0 => {
+                    for col in center_prev.x.min(center_cur.x)..center_prev.x.max(center_cur.x) {
+                        map.tiles[(col + center_cur.y * width) as usize] = TileType::Floor;
+                    }
+                    for row in center_prev.y.min(center_cur.y)..center_prev.y.max(center_cur.y) {
+                        map.tiles[(center_prev.x + row * width) as usize] = TileType::Floor;
+                    }
+                }
+                _ => {
+                    for col in center_prev.x.min(center_cur.x)..center_prev.x.max(center_cur.x) {
+                        map.tiles[(col + center_prev.y * width) as usize] = TileType::Floor;
+                    }
+                    for row in center_prev.y.min(center_cur.y)..center_prev.y.max(center_cur.y) {
+                        map.tiles[(center_cur.x + row * width) as usize] = TileType::Floor;
+                    }
+                }
+            }
+            prev_room = room;
+        }
+
         for room in rooms {
-            room.for_each(|point| map.tiles[(point.x + point.y * width) as usize] = true);
+            room.for_each(|point| {
+                map.tiles[(point.x + point.y * width) as usize] = TileType::Floor
+            });
         }
 
         map
@@ -64,7 +98,7 @@ impl MapGenerator {
 impl Map {
     pub fn new(width: i32, height: i32, start_x: i32, start_y: i32) -> Self {
         Self {
-            tiles: vec![false; (width * height) as usize],
+            tiles: vec![TileType::Wall; (width * height) as usize],
             memory: vec![false; (width * height) as usize],
             width,
             height,
@@ -80,7 +114,7 @@ impl Map {
             let map_x = point.x - viewport.x1 + offset.x;
             let map_y = point.y - viewport.y1 + offset.y;
             let idx = map_x + map_y * self.width;
-            if self.tiles[idx as usize] {
+            if self.tiles[idx as usize] == TileType::Floor {
                 ctx.print(point.x, point.y, ".");
             }
         });
@@ -95,7 +129,7 @@ impl Map {
 
     pub fn walkable(&self, x: i32, y: i32) -> bool {
         let idx = x + y * self.width;
-        self.tiles[idx as usize]
+        self.tiles[idx as usize] == TileType::Floor
     }
 
     pub fn width(&self) -> i32 {
@@ -127,7 +161,7 @@ impl BaseMap for Map {
         if idx >= (self.width * self.height) as usize {
             panic!("bug in bracket-lib");
         } else {
-            !self.tiles[idx as usize]
+            self.tiles[idx as usize] != TileType::Floor
         }
     }
 }
