@@ -4,7 +4,7 @@ use bracket_lib::prelude::*;
 mod player;
 pub use player::Player;
 
-#[derive(Debug, Component)]
+#[derive(Debug, Component, Copy, Clone)]
 pub struct Position {
     pub x: i32,
     pub y: i32,
@@ -16,6 +16,12 @@ impl Position {
             x: self.x,
             y: self.y,
         }
+    }
+}
+
+impl From<&Position> for Point {
+    fn from(p: &Position) -> Self {
+        Self { x: p.x, y: p.y }
     }
 }
 

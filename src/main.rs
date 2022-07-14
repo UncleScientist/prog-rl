@@ -77,10 +77,13 @@ impl GameState for State {
                 );
 
                 let drawables = self.ecs.get_resource::<DrawList>().unwrap();
-                for d in &drawables.items {
+                let mut draw = drawables.items.to_vec();
+                draw.sort_by(|a, b| a.priority.cmp(&b.priority));
+
+                for d in &draw {
                     let point = Point {
-                        x: d.x - offset.x + vp.x1,
-                        y: d.y - offset.y + vp.y1,
+                        x: d.pos.x - offset.x + vp.x1,
+                        y: d.pos.y - offset.y + vp.y1,
                     };
                     if vp.point_in_rect(point) {
                         ctx.print(point.x, point.y, d.glyph);
@@ -97,18 +100,19 @@ struct DrawList {
     items: Vec<Drawable>,
 }
 
+#[derive(Copy, Clone)]
 struct Drawable {
-    x: i32,
-    y: i32,
+    pos: Point,
     glyph: char,
+    priority: usize,
 }
 
 impl Drawable {
-    pub fn new(pos: &Position, glyph: char) -> Self {
+    pub fn new(pos: &Position, glyph: char, priority: usize) -> Self {
         Self {
-            x: pos.x,
-            y: pos.y,
+            pos: pos.into(),
             glyph,
+            priority,
         }
     }
 }
@@ -160,10 +164,21 @@ fn main() -> BError {
                 .with_system(map_update_system),
         )
         .with_stage(
+            "reset",
+            SystemStage::parallel()
+                .with_run_criteria(run_if_player_performed_an_action)
+                .with_system(clear_screen),
+        )
+        .with_stage(
+            "AI",
+            SystemStage::parallel()
+                .with_run_criteria(run_if_player_performed_an_action)
+                .with_system(move_mobs),
+        )
+        .with_stage(
             "update",
             SystemStage::single_threaded()
                 .with_run_criteria(run_if_player_performed_an_action)
-                .with_system(move_mobs)
                 .with_system(draw_map)
                 .with_system(draw_mobs),
         )
@@ -198,6 +213,7 @@ fn main() -> BError {
                 .spawn()
                 .insert(Mob { glyph: 'r' })
                 .insert(Stats::new(2, 2))
+                .insert(Viewshed::new(2))
                 .insert(Position { x, y });
             count += 1;
         }
@@ -268,19 +284,41 @@ fn handle_key(
     }
 }
 
-fn draw_mobs(mut draw_list: ResMut<DrawList>, query: Query<(&Position, &Mob)>) {
-    for (position, mob) in query.iter() {
-        draw_list.items.push(Drawable::new(position, mob.glyph));
+fn draw_mobs(
+    mut draw_list: ResMut<DrawList>,
+    query: Query<(&Position, Option<&Mob>, Option<&Player>, &Viewshed)>,
+) {
+    let mut vs = None;
+    let mut to_draw = Vec::new();
+    let mut count = 0;
+
+    for (position, mob, player, viewshed) in query.iter() {
+        if player.is_some() {
+            vs = Some(viewshed);
+        } else if let Some(mob) = mob {
+            to_draw.push(Drawable::new(position, mob.glyph, 1));
+        }
+        count += 1;
+    }
+
+    if let Some(vs) = vs {
+        to_draw.retain(|x| vs.visible_tiles.contains(&x.pos));
+        console::log(format!("{count} {}", to_draw.len()));
+        draw_list.items.append(&mut to_draw);
     }
 }
 
-fn draw_map(mut draw_list: ResMut<DrawList>, map: Res<Map>, query: Query<(&Player, &Viewshed)>) {
+fn clear_screen(mut draw_list: ResMut<DrawList>) {
     draw_list.items.clear();
+}
+
+fn draw_map(mut draw_list: ResMut<DrawList>, map: Res<Map>, query: Query<(&Player, &Viewshed)>) {
     for (_, viewshed) in query.iter() {
         for point in &viewshed.visible_tiles {
             draw_list.items.push(Drawable::new(
                 &point.into(),
                 if map.xy_is_opaque(point) { '#' } else { '.' },
+                0,
             ));
         }
     }
@@ -290,6 +328,7 @@ fn draw_map(mut draw_list: ResMut<DrawList>, map: Res<Map>, query: Query<(&Playe
             draw_list.items.push(Drawable::new(
                 &(&p).into(),
                 if map.xy_is_opaque(&p) { '#' } else { '.' },
+                0,
             ));
         }
     }
