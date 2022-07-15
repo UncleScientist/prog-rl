@@ -7,6 +7,7 @@ use crate::components::*;
 pub struct Map {
     pub tiles: Vec<TileType>,
     pub memory: Vec<bool>,
+    pub entity: Vec<Vec<Entity>>,
     pub width: i32,
     pub height: i32,
     start_x: i32,
@@ -100,6 +101,7 @@ impl Map {
         Self {
             tiles: vec![TileType::Wall; (width * height) as usize],
             memory: vec![false; (width * height) as usize],
+            entity: vec![Vec::new(); (width * height) as usize],
             width,
             height,
             start_x,
@@ -107,17 +109,21 @@ impl Map {
         }
     }
 
-    // start_x, start_y: upper left corner of map
-    // viewport: where to draw on the screen
-    pub fn _draw(&self, ctx: &mut BTerm, offset: &Position, viewport: &Rect) {
-        viewport.for_each(|point| {
-            let map_x = point.x - viewport.x1 + offset.x;
-            let map_y = point.y - viewport.y1 + offset.y;
-            let idx = map_x + map_y * self.width;
-            if self.tiles[idx as usize] == TileType::Floor {
-                ctx.print(point.x, point.y, ".");
-            }
-        });
+    pub fn add_entity(&mut self, p: &Position, id: Entity) {
+        let idx = self.pos_to_idx(p);
+        self.entity[idx].push(id);
+    }
+
+    pub fn move_entity(&mut self, old_pos: &Position, new_pos: &Position, id: Entity) {
+        let old = self.pos_to_idx(old_pos);
+        let new = self.pos_to_idx(new_pos);
+        self.entity[old].retain(|x| *x != id);
+        self.entity[new].push(id);
+    }
+
+    pub fn try_walk(&self, p: &Position) -> Option<&Entity> {
+        let idx = self.pos_to_idx(p);
+        self.entity[idx].last()
     }
 
     pub fn center_of(&self) -> Position {
@@ -138,6 +144,10 @@ impl Map {
 
     pub fn height(&self) -> i32 {
         self.height
+    }
+
+    pub fn pos_to_idx(&self, p: &Position) -> usize {
+        (p.x + p.y * self.width) as usize
     }
 
     pub fn xy_is_opaque(&self, p: &Point) -> bool {

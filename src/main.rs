@@ -4,6 +4,9 @@ use bevy_ecs::schedule::ShouldRun;
 
 use bracket_lib::prelude::*;
 
+mod combat;
+use combat::*;
+
 mod game_state;
 use game_state::*;
 
@@ -53,7 +56,10 @@ fn main() -> BError {
     let schedule = Schedule::default()
         .with_stage(
             "clear",
-            SystemStage::parallel().with_system(Events::<KeyboardEvent>::update_system),
+            SystemStage::parallel()
+                .with_system(Events::<KeyboardEvent>::update_system)
+                .with_system(Events::<DealDamage>::update_system)
+                .with_system(Events::<MeleeEvent>::update_system),
         )
         .with_stage("player", SystemStage::parallel().with_system(handle_key))
         .with_stage(
@@ -76,6 +82,12 @@ fn main() -> BError {
                 .with_system(move_mobs),
         )
         .with_stage(
+            "combat",
+            SystemStage::parallel()
+                .with_system(resolve_combat)
+                .with_system(deal_damage.after(resolve_combat)),
+        )
+        .with_stage(
             "update",
             SystemStage::single_threaded()
                 .with_run_criteria(run_if_player_performed_an_action)
@@ -96,12 +108,14 @@ fn main() -> BError {
     );
 
     gs.ecs.init_resource::<Events<KeyboardEvent>>();
+    gs.ecs.init_resource::<Events<MeleeEvent>>();
+    gs.ecs.init_resource::<Events<DealDamage>>();
     gs.ecs.insert_resource(RandomNumberGenerator::new());
     gs.ecs.insert_resource(Viewport::with_size(1, 1, 37, 22));
     gs.ecs.insert_resource(DrawList { items: Vec::new() });
     gs.ecs.insert_resource(RunSystems { run_systems: true });
 
-    let map = MapGenerator::generate(&mut gs.ecs, WIDTH * 2, HEIGHT * 2);
+    let mut map = MapGenerator::generate(&mut gs.ecs, WIDTH * 2, HEIGHT * 2);
     let starting_position = map.center_of();
 
     // temporarly spawn some mobs
@@ -111,12 +125,16 @@ fn main() -> BError {
         let x = rng.range(0, map.width());
         let y = rng.range(0, map.height());
         if map.walkable(x, y) {
-            gs.ecs
+            let p = Position { x, y };
+            let id = gs
+                .ecs
                 .spawn()
                 .insert(Mob { glyph: 'r' })
                 .insert(Stats::new(2, 2))
                 .insert(Viewshed::new(2))
-                .insert(Position { x, y });
+                .insert(p)
+                .id();
+            map.add_entity(&p, id);
             count += 1;
         }
     }
@@ -185,10 +203,10 @@ fn draw_map(mut draw_list: ResMut<DrawList>, map: Res<Map>, query: Query<(&Playe
 
 fn move_mobs(
     mut rng: ResMut<RandomNumberGenerator>,
-    map: Res<Map>,
-    mut query: Query<(&mut Position, &Mob)>,
+    mut map: ResMut<Map>,
+    mut query: Query<(Entity, &mut Position, &Mob)>,
 ) {
-    for (mut position, _) in query.iter_mut() {
+    for (id, mut position, _) in query.iter_mut() {
         if let Some(new_pos) = match rng.range(0, 4) {
             0 => {
                 if position.x > 0 {
@@ -233,6 +251,7 @@ fn move_mobs(
             _ => panic!("rng failure"),
         } {
             if map.walkable(new_pos.x, new_pos.y) {
+                map.move_entity(&*position, &new_pos, id);
                 *position = new_pos;
             }
         }
