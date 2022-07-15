@@ -24,43 +24,43 @@ pub fn handle_key(
         for (source, (mut position, _)) in query.iter_mut() {
             let mut new_position = *position;
             match event.0 {
-                VirtualKeyCode::H => {
+                VirtualKeyCode::Numpad4 | VirtualKeyCode::H => {
                     new_position.x -= 1;
                     action_performed = true;
                 }
-                VirtualKeyCode::L => {
+                VirtualKeyCode::Numpad6 | VirtualKeyCode::L => {
                     new_position.x += 1;
                     action_performed = true;
                 }
-                VirtualKeyCode::J => {
+                VirtualKeyCode::Numpad2 | VirtualKeyCode::J => {
                     new_position.y += 1;
                     action_performed = true;
                 }
-                VirtualKeyCode::K => {
+                VirtualKeyCode::Numpad8 | VirtualKeyCode::K => {
                     new_position.y -= 1;
                     action_performed = true;
                 }
-                VirtualKeyCode::Y => {
+                VirtualKeyCode::Numpad7 | VirtualKeyCode::Y => {
                     new_position.x -= 1;
                     new_position.y -= 1;
                     action_performed = true;
                 }
-                VirtualKeyCode::U => {
+                VirtualKeyCode::Numpad9 | VirtualKeyCode::U => {
                     new_position.x += 1;
                     new_position.y -= 1;
                     action_performed = true;
                 }
-                VirtualKeyCode::N => {
+                VirtualKeyCode::Numpad1 | VirtualKeyCode::B => {
                     new_position.x -= 1;
                     new_position.y += 1;
                     action_performed = true;
                 }
-                VirtualKeyCode::M => {
+                VirtualKeyCode::Numpad3 | VirtualKeyCode::N => {
                     new_position.x += 1;
                     new_position.y += 1;
                     action_performed = true;
                 }
-                VirtualKeyCode::Space => {
+                VirtualKeyCode::Numpad5 | VirtualKeyCode::Space => {
                     action_performed = true;
                 }
                 _ => {}
