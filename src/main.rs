@@ -1,10 +1,17 @@
-use std::fmt::Display;
-
 use bevy_ecs::event::Events;
 use bevy_ecs::prelude::*;
 use bevy_ecs::schedule::ShouldRun;
 
 use bracket_lib::prelude::*;
+
+mod game_state;
+use game_state::*;
+
+mod keyboard;
+use keyboard::*;
+
+mod drawable;
+use drawable::*;
 
 mod components;
 use components::*;
@@ -22,118 +29,11 @@ embedded_resource!(CHEEP_FONT, "../resources/cheepicus8x8.png");
 const WIDTH: i32 = 40;
 const HEIGHT: i32 = 25;
 
-type Viewport = Rect;
-
-pub enum RunState {
-    WelcomeScreen,
-    StartGame,
-}
-
-struct State {
-    ecs: World,
-    display: RunState,
-    schedule: Schedule,
-}
-
-impl GameState for State {
-    fn tick(&mut self, ctx: &mut BTerm) {
-        self.schedule.run(&mut self.ecs);
-
-        ctx.cls();
-        match self.display {
-            RunState::WelcomeScreen => {
-                self.center_at_row(ctx, 2, "Welcome to \"Prog-Rog\"");
-                self.center_at_row(ctx, 3, "A Programmable Roguelike");
-
-                self.center_at_row(ctx, 5, "Press ENTER to Start");
-                if let Some(VirtualKeyCode::Return) = ctx.key {
-                    self.display = RunState::StartGame;
-                }
-            }
-
-            RunState::StartGame => {
-                if let Some(key) = ctx.key {
-                    let mut events = self
-                        .ecs
-                        .get_resource_mut::<Events<KeyboardEvent>>()
-                        .unwrap();
-                    events.send(KeyboardEvent(key));
-                }
-
-                let vp = self.ecs.get_resource::<Viewport>().unwrap();
-                let player = self.ecs.get_resource::<Entity>().unwrap();
-                let player_ref = self.ecs.entity(*player);
-                let p = player_ref.get::<Position>().unwrap();
-                let offset = Position {
-                    x: 0.max(p.x - WIDTH / 2),
-                    y: 0.max(p.y - HEIGHT / 2),
-                };
-
-                let stats = player_ref.get::<Stats>().unwrap();
-                ctx.print(
-                    0,
-                    HEIGHT - 1,
-                    format!("HP:{} MP:{}", stats.hp.cur, stats.mp.cur),
-                );
-
-                let drawables = self.ecs.get_resource::<DrawList>().unwrap();
-                let mut draw = drawables.items.to_vec();
-                draw.sort_by(|a, b| a.priority.cmp(&b.priority));
-
-                for d in &draw {
-                    let point = Point {
-                        x: d.pos.x - offset.x + vp.x1,
-                        y: d.pos.y - offset.y + vp.y1,
-                    };
-                    if vp.point_in_rect(point) {
-                        ctx.print(point.x, point.y, d.glyph);
-                    }
-                }
-
-                ctx.print(p.x - offset.x + vp.x1, p.y - offset.y + vp.y1, '@');
-            }
-        }
-    }
-}
-
-struct DrawList {
-    items: Vec<Drawable>,
-}
-
-#[derive(Copy, Clone)]
-struct Drawable {
-    pos: Point,
-    glyph: char,
-    priority: usize,
-}
-
-impl Drawable {
-    pub fn new(pos: &Position, glyph: char, priority: usize) -> Self {
-        Self {
-            pos: pos.into(),
-            glyph,
-            priority,
-        }
-    }
-}
-
-struct RunSystems {
-    run_systems: bool,
-}
-
 fn run_if_player_performed_an_action(rs: Res<RunSystems>) -> ShouldRun {
     if rs.run_systems {
         ShouldRun::Yes
     } else {
         ShouldRun::No
-    }
-}
-
-impl State {
-    fn center_at_row<D: Display>(&self, ctx: &mut BTerm, row: i32, message: D) {
-        let s = format!("{message}");
-        let col = WIDTH / 2 - s.len() as i32 / 2;
-        ctx.print(col, row, s);
     }
 }
 
@@ -180,18 +80,20 @@ fn main() -> BError {
             SystemStage::single_threaded()
                 .with_run_criteria(run_if_player_performed_an_action)
                 .with_system(draw_map)
-                .with_system(draw_mobs),
+                .with_system(draw_mobs.after(move_mobs)),
         )
         .with_stage(
             "cleanup",
             SystemStage::parallel().with_system(clear_run_flag),
         );
 
-    let mut gs = State {
-        ecs: World::new(),
-        display: RunState::WelcomeScreen,
+    let mut gs = crate::game_state::State::new(
+        World::new(),
+        RunState::WelcomeScreen,
         schedule,
-    };
+        WIDTH,
+        HEIGHT,
+    );
 
     gs.ecs.init_resource::<Events<KeyboardEvent>>();
     gs.ecs.insert_resource(RandomNumberGenerator::new());
@@ -234,63 +136,12 @@ fn main() -> BError {
     main_loop(context, gs)
 }
 
-struct KeyboardEvent(VirtualKeyCode);
-
-fn handle_key(
-    mut reader: EventReader<KeyboardEvent>,
-    map: Res<Map>,
-    mut runner: ResMut<RunSystems>,
-    mut query: Query<&mut Position, With<Player>>,
-) {
-    let mut action_performed = false;
-
-    for (event, _id) in reader.iter_with_id() {
-        for mut position in query.iter_mut() {
-            match event.0 {
-                VirtualKeyCode::H => {
-                    if map.walkable(position.x - 1, position.y) {
-                        position.x -= 1;
-                        action_performed = true;
-                    }
-                }
-                VirtualKeyCode::L => {
-                    if map.walkable(position.x + 1, position.y) {
-                        position.x += 1;
-                        action_performed = true;
-                    }
-                }
-                VirtualKeyCode::J => {
-                    if map.walkable(position.x, position.y + 1) {
-                        position.y += 1;
-                        action_performed = true;
-                    }
-                }
-                VirtualKeyCode::K => {
-                    if map.walkable(position.x, position.y - 1) {
-                        position.y -= 1;
-                        action_performed = true;
-                    }
-                }
-                VirtualKeyCode::Space => {
-                    action_performed = true;
-                }
-                _ => {}
-            }
-        }
-    }
-
-    if action_performed {
-        runner.run_systems = true;
-    }
-}
-
 fn draw_mobs(
     mut draw_list: ResMut<DrawList>,
     query: Query<(&Position, Option<&Mob>, Option<&Player>, &Viewshed)>,
 ) {
     let mut vs = None;
     let mut to_draw = Vec::new();
-    let mut count = 0;
 
     for (position, mob, player, viewshed) in query.iter() {
         if player.is_some() {
@@ -298,12 +149,10 @@ fn draw_mobs(
         } else if let Some(mob) = mob {
             to_draw.push(Drawable::new(position, mob.glyph, 1));
         }
-        count += 1;
     }
 
     if let Some(vs) = vs {
         to_draw.retain(|x| vs.visible_tiles.contains(&x.pos));
-        console::log(format!("{count} {}", to_draw.len()));
         draw_list.items.append(&mut to_draw);
     }
 }
