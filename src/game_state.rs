@@ -7,6 +7,7 @@ use bracket_lib::prelude::*;
 use crate::components::*;
 use crate::drawable::*;
 use crate::keyboard::*;
+use crate::messages::*;
 
 pub struct RunSystems {
     pub run_systems: bool,
@@ -64,6 +65,10 @@ impl GameState for State {
                 self.center_at_row(ctx, 5, "Press ENTER to Start");
                 if let Some(VirtualKeyCode::Return) = ctx.key {
                     self.display = RunState::StartGame;
+                    self.ecs
+                        .get_resource_mut::<Messages>()
+                        .unwrap()
+                        .add("Welcome!");
                 }
             }
 
@@ -74,6 +79,16 @@ impl GameState for State {
                         .get_resource_mut::<Events<KeyboardEvent>>()
                         .unwrap();
                     events.send(KeyboardEvent(key));
+                }
+                let rs = self.ecs.get_resource::<RunSystems>().unwrap().run_systems;
+
+                let mut messages = self.ecs.get_resource_mut::<Messages>().unwrap();
+                if let Some(msg) = messages.current() {
+                    ctx.print(0, 0, msg);
+                    if rs {
+                        console::log("advancing message");
+                        messages.advance();
+                    }
                 }
 
                 let vp = self.ecs.get_resource::<Viewport>().unwrap();

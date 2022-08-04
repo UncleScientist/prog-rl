@@ -4,6 +4,7 @@ use bracket_lib::prelude::*;
 use crate::components::*;
 use crate::game_state::*;
 use crate::map::*;
+use crate::messages::*;
 
 pub struct KeyboardEvent(pub VirtualKeyCode);
 pub struct MeleeEvent {
@@ -14,6 +15,7 @@ pub struct MeleeEvent {
 pub fn handle_key(
     mut reader: EventReader<KeyboardEvent>,
     mut writer: EventWriter<MeleeEvent>,
+    mut messages: ResMut<Messages>,
     map: Res<Map>,
     mut runner: ResMut<RunSystems>,
     mut query: Query<(Entity, (&mut Position, With<Player>))>,
@@ -72,7 +74,7 @@ pub fn handle_key(
                         source,
                         target: *target,
                     });
-                    console::log(format!("Attempting to attack {target:?}"));
+                    messages.add("You attack!");
                 } else {
                     *position = new_position;
                 }

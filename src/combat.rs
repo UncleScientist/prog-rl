@@ -1,8 +1,8 @@
 use bevy_ecs::prelude::*;
-use bracket_lib::prelude::*;
 
 use crate::components::*;
 use crate::keyboard::*;
+use crate::messages::*;
 
 pub struct DealDamage {
     pub entity: Entity,
@@ -41,18 +41,19 @@ pub fn resolve_combat(
 pub fn deal_damage(
     mut commands: Commands,
     mut reader: EventReader<DealDamage>,
+    mut messages: ResMut<Messages>,
     mut query: Query<(Entity, &mut Stats)>,
 ) {
     for event in reader.iter() {
         for (entity, mut stats) in query.iter_mut() {
             if event.entity == entity {
                 stats.hp.cur -= event.amount;
-                console::log(format!("mob attacked for {} points", event.amount));
+                messages.add(format!("You hit the rat for {} points", event.amount));
             }
 
             if stats.hp.cur < 0 {
                 commands.entity(entity).despawn();
-                console::log("mob despawned");
+                messages.add("You killed it!");
             }
         }
     }

@@ -4,6 +4,9 @@ use bevy_ecs::schedule::ShouldRun;
 
 use bracket_lib::prelude::*;
 
+mod messages;
+use messages::*;
+
 mod combat;
 use combat::*;
 
@@ -84,6 +87,7 @@ fn main() -> BError {
         .with_stage(
             "combat",
             SystemStage::parallel()
+                .with_run_criteria(run_if_player_performed_an_action)
                 .with_system(resolve_combat)
                 .with_system(deal_damage.after(resolve_combat)),
         )
@@ -114,6 +118,7 @@ fn main() -> BError {
     gs.ecs.insert_resource(Viewport::with_size(1, 1, 37, 22));
     gs.ecs.insert_resource(DrawList { items: Vec::new() });
     gs.ecs.insert_resource(RunSystems { run_systems: true });
+    gs.ecs.insert_resource(Messages::default());
 
     let mut map = MapGenerator::generate(&mut gs.ecs, WIDTH * 2, HEIGHT * 2);
     let starting_position = map.center_of();
@@ -175,8 +180,9 @@ fn draw_mobs(
     }
 }
 
-fn clear_screen(mut draw_list: ResMut<DrawList>) {
+fn clear_screen(mut draw_list: ResMut<DrawList>, mut messages: ResMut<Messages>) {
     draw_list.items.clear();
+    messages.advance();
 }
 
 fn draw_map(mut draw_list: ResMut<DrawList>, map: Res<Map>, query: Query<(&Player, &Viewshed)>) {
