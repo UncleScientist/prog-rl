@@ -285,11 +285,9 @@ fn resolve_movement(world: &mut World) {
     let map = world.get_resource::<Map>().unwrap();
     let mut do_move = std::collections::HashMap::<Entity, (Position, Position)>::new();
     for (old_pos, new_pos, id) in move_actions {
-        if map.can_move_mob(world, &new_pos) {
-            if !pos_set.contains(&new_pos) {
-                pos_set.insert(new_pos);
-                do_move.insert(id, (old_pos, new_pos));
-            }
+        if map.can_move_mob(world, &new_pos) && !pos_set.contains(&new_pos) {
+            pos_set.insert(new_pos);
+            do_move.insert(id, (old_pos, new_pos));
         }
     }
 
