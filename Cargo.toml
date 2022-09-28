@@ -9,3 +9,4 @@ edition = "2021"
 getrandom = { version = "0.2", features = ["js"] }
 bracket-lib = "0.8.1"
 bevy_ecs = "0.7.0"
+# rlua = "0.19.4"
