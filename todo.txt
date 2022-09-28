@@ -1,6 +1,10 @@
 - refactor keyboard code to be able to handle different screens (inventory,
     shops, spellcasting/portable-electronic-quantum-manipulators, and so on)
 
+- inventory
+
+- objects (wands, remote controls, spellbooks, phasers)
+
 - helper functions for generating mobs
 
 - develop a mini-language for controlling mobs (or just use Lua if we can figure
