@@ -126,6 +126,21 @@ impl Map {
         self.entity[idx].last()
     }
 
+    pub fn can_move_mob(&self, world: &World, new_pos: &Position) -> bool {
+        let idx = self.pos_to_idx(new_pos);
+        if !self.walkable(new_pos) {
+            return false;
+        }
+
+        for p in self.entity[idx].iter() {
+            let e = world.get_entity(*p).unwrap();
+            if e.get::<Mob>().is_some() {
+                return false;
+            }
+        }
+        true
+    }
+
     pub fn center_of(&self) -> Position {
         Position {
             x: self.start_x,
@@ -133,8 +148,8 @@ impl Map {
         }
     }
 
-    pub fn walkable(&self, x: i32, y: i32) -> bool {
-        let idx = x + y * self.width;
+    pub fn walkable(&self, pos: &Position) -> bool {
+        let idx = pos.x + pos.y * self.width;
         self.tiles[idx as usize] == TileType::Floor
     }
 

@@ -85,6 +85,11 @@ fn main() -> BError {
                 .with_system(move_mobs),
         )
         .with_stage(
+            "resolution",
+            SystemStage::single_threaded()
+                .with_system(resolve_movement.exclusive_system().at_end()),
+        )
+        .with_stage(
             "combat",
             SystemStage::parallel()
                 .with_run_criteria(run_if_player_performed_an_action)
@@ -127,19 +132,20 @@ fn main() -> BError {
     let mut count = 0;
     let mut rng = RandomNumberGenerator::new();
     while count < 100 {
-        let x = rng.range(0, map.width());
-        let y = rng.range(0, map.height());
-        if map.walkable(x, y) {
-            let p = Position { x, y };
+        let pos = Position {
+            x: rng.range(0, map.width()),
+            y: rng.range(0, map.height()),
+        };
+        if map.walkable(&pos) {
             let id = gs
                 .ecs
                 .spawn()
                 .insert(Mob { glyph: 'r' })
                 .insert(Stats::new(2, 2))
                 .insert(Viewshed::new(2))
-                .insert(p)
+                .insert(pos)
                 .id();
-            map.add_entity(&p, id);
+            map.add_entity(&pos, id);
             count += 1;
         }
     }
@@ -207,11 +213,12 @@ fn draw_map(mut draw_list: ResMut<DrawList>, map: Res<Map>, query: Query<(&Playe
 }
 
 fn move_mobs(
+    mut commands: Commands,
     mut rng: ResMut<RandomNumberGenerator>,
-    mut map: ResMut<Map>,
-    mut query: Query<(Entity, &mut Position, &Mob)>,
+    map: Res<Map>,
+    mut query: Query<(Entity, &Position, &Mob)>,
 ) {
-    for (id, mut position, _) in query.iter_mut() {
+    for (id, position, _) in query.iter_mut() {
         if let Some(new_pos) = match rng.range(0, 4) {
             0 => {
                 if position.x > 0 {
@@ -255,14 +262,46 @@ fn move_mobs(
             }
             _ => panic!("rng failure"),
         } {
-            if map.walkable(new_pos.x, new_pos.y) {
-                map.move_entity(&*position, &new_pos, id);
-                *position = new_pos;
-            }
+            commands
+                .entity(id)
+                .insert(WantsToMove { location: new_pos });
         }
     }
 }
 
 fn clear_run_flag(mut rs: ResMut<RunSystems>) {
     rs.run_systems = false;
+}
+
+fn resolve_movement(world: &mut World) {
+    let mut pos_set = std::collections::HashSet::new();
+    let mut move_actions = Vec::new();
+
+    let mut query = world.query::<(Entity, &WantsToMove, &Position)>();
+    for (id, new_pos, old_pos) in query.iter(world) {
+        move_actions.push((*old_pos, new_pos.location, id));
+    }
+
+    let map = world.get_resource::<Map>().unwrap();
+    let mut do_move = std::collections::HashMap::<Entity, (Position, Position)>::new();
+    for (old_pos, new_pos, id) in move_actions {
+        if map.can_move_mob(world, &new_pos) {
+            if !pos_set.contains(&new_pos) {
+                pos_set.insert(new_pos);
+                do_move.insert(id, (old_pos, new_pos));
+            }
+        }
+    }
+
+    let mut query = world.query::<(Entity, &WantsToMove, &mut Position)>();
+    for (id, _, mut old_pos) in query.iter_mut(world) {
+        if let Some((_, new_pos)) = do_move.get(&id) {
+            *old_pos = *new_pos;
+        }
+    }
+
+    let mut map = world.get_resource_mut::<Map>().unwrap();
+    for (id, (old, new)) in do_move {
+        map.move_entity(&old, &new, id);
+    }
 }

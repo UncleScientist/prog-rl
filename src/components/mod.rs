@@ -4,7 +4,7 @@ use bracket_lib::prelude::*;
 mod player;
 pub use player::Player;
 
-#[derive(Debug, Component, Copy, Clone, PartialEq)]
+#[derive(Debug, Component, Copy, Clone, PartialEq, Hash, Eq)]
 pub struct Position {
     pub x: i32,
     pub y: i32,
@@ -55,6 +55,11 @@ impl Stats {
             mp: Stat { max: mp, cur: mp },
         }
     }
+}
+
+#[derive(Debug, Component, Copy, Clone)]
+pub struct WantsToMove {
+    pub location: Position,
 }
 
 #[derive(Debug, Component, Copy, Clone)]

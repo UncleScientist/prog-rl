@@ -24,10 +24,8 @@ pub fn handle_key(
     let mut advance_message = false;
 
     for event in reader.iter() {
-        if !messages.is_empty() {
-            if event.0 != VirtualKeyCode::Space {
-                continue;
-            }
+        if !messages.is_empty() && event.0 != VirtualKeyCode::Space {
+            continue;
         }
 
         for (source, (mut position, _)) in query.iter_mut() {
@@ -78,7 +76,7 @@ pub fn handle_key(
                 _ => {}
             }
 
-            if *position != new_position && map.walkable(new_position.x, new_position.y) {
+            if *position != new_position && map.walkable(&new_position) {
                 if let Some(target) = map.try_walk(&new_position) {
                     writer.send(MeleeEvent {
                         source,

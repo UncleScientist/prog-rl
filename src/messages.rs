@@ -36,12 +36,4 @@ impl Messages {
     pub fn advance(&mut self) {
         self.msg.pop_front();
     }
-
-    pub fn is_seen(&self) -> bool {
-        if let Some(m) = self.msg.front() {
-            m.seen
-        } else {
-            false
-        }
-    }
 }
