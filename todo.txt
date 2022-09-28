@@ -1,0 +1,13 @@
+- refactor keyboard code to be able to handle different screens (inventory,
+    shops, spellcasting/portable-electronic-quantum-manipulators, and so on)
+
+- helper functions for generating mobs
+
+- develop a mini-language for controlling mobs (or just use Lua if we can figure
+    out how to build it for WASM)
+
+- mob AI
+
+- better levels
+
+- town level, or above-ground areas
