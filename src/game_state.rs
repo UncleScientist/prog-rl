@@ -80,15 +80,10 @@ impl GameState for State {
                         .unwrap();
                     events.send(KeyboardEvent(key));
                 }
-                let rs = self.ecs.get_resource::<RunSystems>().unwrap().run_systems;
 
                 let mut messages = self.ecs.get_resource_mut::<Messages>().unwrap();
                 if let Some(msg) = messages.current() {
                     ctx.print(0, 0, msg);
-                    if rs {
-                        console::log("advancing message");
-                        messages.advance();
-                    }
                 }
 
                 let vp = self.ecs.get_resource::<Viewport>().unwrap();

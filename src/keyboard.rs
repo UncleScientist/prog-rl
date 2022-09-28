@@ -21,8 +21,15 @@ pub fn handle_key(
     mut query: Query<(Entity, (&mut Position, With<Player>))>,
 ) {
     let mut action_performed = false;
+    let mut advance_message = false;
 
     for event in reader.iter() {
+        if !messages.is_empty() {
+            if event.0 != VirtualKeyCode::Space {
+                continue;
+            }
+        }
+
         for (source, (mut position, _)) in query.iter_mut() {
             let mut new_position = *position;
             match event.0 {
@@ -62,7 +69,10 @@ pub fn handle_key(
                     new_position.y += 1;
                     action_performed = true;
                 }
-                VirtualKeyCode::Numpad5 | VirtualKeyCode::Space => {
+                VirtualKeyCode::Space => {
+                    advance_message = true;
+                }
+                VirtualKeyCode::Numpad5 => {
                     action_performed = true;
                 }
                 _ => {}
@@ -84,5 +94,7 @@ pub fn handle_key(
 
     if action_performed {
         runner.run_systems = true;
+    } else if advance_message {
+        messages.advance();
     }
 }

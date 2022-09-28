@@ -126,7 +126,7 @@ fn main() -> BError {
     // temporarly spawn some mobs
     let mut count = 0;
     let mut rng = RandomNumberGenerator::new();
-    while count < 10 {
+    while count < 100 {
         let x = rng.range(0, map.width());
         let y = rng.range(0, map.height());
         if map.walkable(x, y) {
@@ -180,9 +180,8 @@ fn draw_mobs(
     }
 }
 
-fn clear_screen(mut draw_list: ResMut<DrawList>, mut messages: ResMut<Messages>) {
+fn clear_screen(mut draw_list: ResMut<DrawList>) {
     draw_list.items.clear();
-    messages.advance();
 }
 
 fn draw_map(mut draw_list: ResMut<DrawList>, map: Res<Map>, query: Query<(&Player, &Viewshed)>) {
