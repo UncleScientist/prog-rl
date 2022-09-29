@@ -20,12 +20,39 @@ pub enum TileType {
     Wall,
 }
 
-pub struct MapGenerator {
-    pub _width: i32,
-    pub _height: i32,
-
-    _rooms: Vec<Rect>,
+pub struct MapFactory<'a> {
+    builders: Vec<&'a dyn MapGenerator>,
 }
+
+impl<'a> MapFactory<'a> {
+    pub fn new() -> Self {
+        Self {
+            builders: Vec::new(),
+        }
+    }
+
+    pub fn create_map(&self, ecs: &mut World, width: i32, height: i32) -> Map {
+        let mut rng = ecs.get_resource_mut::<RandomNumberGenerator>().unwrap();
+        let room_type = rng.range(0, self.builders.len());
+        console::log(room_type);
+
+        self.builders[room_type].generate(ecs, width, height)
+    }
+
+    pub fn add_builder(&mut self, builder: &'a dyn MapGenerator) {
+        self.builders.push(builder);
+    }
+}
+
+pub trait MapGenerator: Send + Sync {
+    fn generate(&self, ecs: &mut World, width: i32, height: i32) -> Map;
+}
+
+pub struct RectRoomMapGenerator;
+
+pub struct RoundRoomMapGenerator;
+
+//const ROOM_TYPES: [&dyn MapGenerator; 2] = [&RectRoomMapGenerator, &RectRoomMapGenerator];
 
 const MIN_WIDTH: i32 = 3;
 const MAX_WIDTH: i32 = 15;
@@ -34,29 +61,72 @@ const MAX_HEIGHT: i32 = 12;
 
 const ROOM_COUNT: usize = 20;
 
-impl MapGenerator {
-    pub fn generate(ecs: &mut World, width: i32, height: i32) -> Map {
-        let mut rooms = Vec::new();
-
+impl MapGenerator for RoundRoomMapGenerator {
+    fn generate(&self, ecs: &mut World, width: i32, height: i32) -> Map {
         let mut rng = ecs.get_resource_mut::<RandomNumberGenerator>().unwrap();
+        let rooms = non_overlapping_rooms(&mut rng, width, height);
 
-        'next: while rooms.len() < ROOM_COUNT {
-            let x1 = rng.range(0, width - MAX_WIDTH);
-            let y1 = rng.range(0, height - MAX_HEIGHT);
-            let w = MIN_WIDTH + rng.range(0, MAX_WIDTH - MIN_WIDTH);
-            let h = MIN_HEIGHT + rng.range(0, MAX_HEIGHT - MIN_HEIGHT);
-            let new_r = Rect::with_size(x1, y1, w, h);
+        let Point {
+            x: start_x,
+            y: start_y,
+        } = rooms[0].center();
+        let mut map = Map::new(width, height, start_x, start_y);
 
-            for r in &rooms {
-                if new_r.intersect(r) {
-                    // try a new rect instead of saving this one
-                    continue 'next;
+        for room in &rooms {
+            let radius = 3.min(((room.x1 - room.x2).abs()).min((room.y1 - room.y2).abs()) / 2);
+
+            let center_pt = room.center();
+            for y in center_pt.y - radius..center_pt.y + radius {
+                for x in center_pt.x - radius..center_pt.x + radius {
+                    let point = Point::new(x, y);
+                    if let Some(idx) = map.point_to_idx(&point) {
+                        let distance = DistanceAlg::Pythagoras.distance2d(center_pt, point);
+                        if idx > 0
+                            && idx < ((map.width * map.height) - 1) as usize
+                            && distance <= (radius as f32)
+                        {
+                            map.tiles[idx] = TileType::Floor;
+                        }
+                    }
                 }
             }
-
-            rooms.push(new_r);
         }
 
+        let mut i = rooms.iter();
+        let mut prev_room = i.next().unwrap();
+        for room in i {
+            let center_prev = prev_room.center();
+            let center_cur = room.center();
+            match rng.range(0, 2) {
+                0 => {
+                    for col in center_prev.x.min(center_cur.x)..center_prev.x.max(center_cur.x) {
+                        map.tiles[(col + center_cur.y * width) as usize] = TileType::Floor;
+                    }
+                    for row in center_prev.y.min(center_cur.y)..center_prev.y.max(center_cur.y) {
+                        map.tiles[(center_prev.x + row * width) as usize] = TileType::Floor;
+                    }
+                }
+                _ => {
+                    for col in center_prev.x.min(center_cur.x)..center_prev.x.max(center_cur.x) {
+                        map.tiles[(col + center_prev.y * width) as usize] = TileType::Floor;
+                    }
+                    for row in center_prev.y.min(center_cur.y)..center_prev.y.max(center_cur.y) {
+                        map.tiles[(center_cur.x + row * width) as usize] = TileType::Floor;
+                    }
+                }
+            }
+            prev_room = room;
+        }
+
+        map
+    }
+}
+
+impl MapGenerator for RectRoomMapGenerator {
+    fn generate(&self, ecs: &mut World, width: i32, height: i32) -> Map {
+        let mut rng = ecs.get_resource_mut::<RandomNumberGenerator>().unwrap();
+
+        let rooms = non_overlapping_rooms(&mut rng, width, height);
         let center = rooms[0].center();
         let mut map = Map::new(width, height, center.x, center.y);
 
@@ -133,9 +203,10 @@ impl Map {
         }
 
         for p in self.entity[idx].iter() {
-            let e = world.get_entity(*p).unwrap();
-            if e.get::<Mob>().is_some() {
-                return false;
+            if let Some(e) = world.get_entity(*p) {
+                if e.get::<Mob>().is_some() {
+                    return false;
+                }
             }
         }
         true
@@ -163,6 +234,14 @@ impl Map {
 
     pub fn pos_to_idx(&self, p: &Position) -> usize {
         (p.x + p.y * self.width) as usize
+    }
+
+    pub fn point_to_idx(&self, p: &Point) -> Option<usize> {
+        if p.x < 0 || p.x >= self.width || p.y < 0 || p.y >= self.height {
+            None
+        } else {
+            Some((p.x + p.y * self.width) as usize)
+        }
     }
 
     pub fn xy_is_opaque(&self, p: &Point) -> bool {
@@ -195,4 +274,25 @@ impl Algorithm2D for Map {
     fn dimensions(&self) -> Point {
         Point::new(self.width, self.height)
     }
+}
+
+fn non_overlapping_rooms(rng: &mut RandomNumberGenerator, width: i32, height: i32) -> Vec<Rect> {
+    let mut rooms = Vec::new();
+    'next: while rooms.len() < ROOM_COUNT {
+        let x1 = rng.range(0, width - MAX_WIDTH);
+        let y1 = rng.range(0, height - MAX_HEIGHT);
+        let w = MIN_WIDTH + rng.range(0, MAX_WIDTH - MIN_WIDTH);
+        let h = MIN_HEIGHT + rng.range(0, MAX_HEIGHT - MIN_HEIGHT);
+        let new_r = Rect::with_size(x1, y1, w, h);
+
+        for r in &rooms {
+            if new_r.intersect(r) {
+                // try a new rect instead of saving this one
+                continue 'next;
+            }
+        }
+
+        rooms.push(new_r);
+    }
+    rooms
 }

@@ -125,13 +125,18 @@ fn main() -> BError {
     gs.ecs.insert_resource(RunSystems { run_systems: true });
     gs.ecs.insert_resource(Messages::default());
 
-    let mut map = MapGenerator::generate(&mut gs.ecs, WIDTH * 2, HEIGHT * 2);
+    let mut factory = MapFactory::new();
+    factory.add_builder(&RectRoomMapGenerator);
+    factory.add_builder(&RoundRoomMapGenerator);
+
+    let mut map = factory.create_map(&mut gs.ecs, WIDTH * 2, HEIGHT * 2);
     let starting_position = map.center_of();
+    gs.ecs.insert_resource(factory);
 
     // temporarly spawn some mobs
     let mut count = 0;
     let mut rng = RandomNumberGenerator::new();
-    while count < 100 {
+    while count < 10 {
         let pos = Position {
             x: rng.range(0, map.width()),
             y: rng.range(0, map.height()),
