@@ -84,7 +84,7 @@ impl MapGenerator for RoundRoomMapGenerator {
         let mut map = Map::new(width, height, start_x, start_y);
 
         for room in &rooms {
-            let radius = 3.min(((room.x1 - room.x2).abs()).min((room.y1 - room.y2).abs()) / 2);
+            let radius = 2 + ((room.x1 - room.x2).abs()).min((room.y1 - room.y2).abs()) / 2;
 
             let center_pt = room.center();
             for y in center_pt.y - radius..center_pt.y + radius {
