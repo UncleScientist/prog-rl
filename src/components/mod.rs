@@ -66,3 +66,8 @@ pub struct WantsToMove {
 pub struct WantsToMelee {
     pub target: Entity,
 }
+
+#[derive(Debug, Component, Clone)]
+pub struct Name {
+    pub name: String,
+}

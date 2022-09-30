@@ -149,6 +149,9 @@ fn main() -> BError {
                 .insert(Stats::new(2, 2))
                 .insert(Viewshed::new(2))
                 .insert(pos)
+                .insert(Name {
+                    name: "Rat".to_string(),
+                })
                 .id();
             map.add_entity(&pos, id);
             count += 1;
@@ -164,6 +167,9 @@ fn main() -> BError {
         .insert(starting_position)
         .insert(Viewshed::new(5))
         .insert(Stats::new(10, 10))
+        .insert(Name {
+            name: "you".to_string(),
+        })
         .id();
     gs.ecs.insert_resource(player);
 
@@ -221,9 +227,14 @@ fn move_mobs(
     mut commands: Commands,
     mut rng: ResMut<RandomNumberGenerator>,
     map: Res<Map>,
-    mut query: Query<(Entity, &Position, &Mob)>,
+    player_q: Query<(Entity, &Player, &Position)>,
+    mut melee: EventWriter<MeleeEvent>,
+    mut messages: ResMut<Messages>,
+    mut query: Query<(Entity, &Position, &Mob, &Name)>,
 ) {
-    for (id, position, _) in query.iter_mut() {
+    let (player_id, _, player_pos) = player_q.iter().next().unwrap();
+
+    for (id, position, _, name) in query.iter_mut() {
         if let Some(new_pos) = match rng.range(0, 4) {
             0 => {
                 if position.x > 0 {
@@ -267,9 +278,17 @@ fn move_mobs(
             }
             _ => panic!("rng failure"),
         } {
-            commands
-                .entity(id)
-                .insert(WantsToMove { location: new_pos });
+            if &new_pos == player_pos {
+                melee.send(MeleeEvent {
+                    source: id,
+                    target: player_id,
+                });
+                messages.add(format!("{} attacks!", name.name))
+            } else {
+                commands
+                    .entity(id)
+                    .insert(WantsToMove { location: new_pos });
+            }
         }
     }
 }

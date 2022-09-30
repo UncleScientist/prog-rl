@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use bevy_ecs::prelude::*;
 
 use crate::components::*;
@@ -5,36 +7,32 @@ use crate::keyboard::*;
 use crate::messages::*;
 
 pub struct DealDamage {
-    pub entity: Entity,
+    pub source: Entity,
+    pub target: Entity,
+    pub name: String,
     pub amount: i32,
 }
 
 pub fn resolve_combat(
     mut reader: EventReader<MeleeEvent>,
     mut writer: EventWriter<DealDamage>,
-    player: Res<Entity>,
-    query: Query<(Entity, &Position, &Stats)>,
+    query: Query<(Entity, &Position, &Stats, &Name)>,
 ) {
-    for event in reader.iter() {
-        // find the player
-        let mut player_stats = None;
-        for (entity, _, stats) in query.iter() {
-            if entity == *player {
-                player_stats = Some(*stats);
-                break;
-            }
-        }
+    let mut hm = HashMap::new();
 
-        if let Some(pstat) = player_stats {
-            for (entity, _position, _stats) in query.iter() {
-                if entity == event.target {
-                    writer.send(DealDamage {
-                        entity,
-                        amount: pstat.hp.cur / 10,
-                    });
-                }
-            }
-        }
+    for (entity, _, stats, name) in query.iter() {
+        hm.insert(entity, (*stats, &name.name));
+    }
+
+    for event in reader.iter() {
+        let source_stats = hm.get(&event.source).unwrap();
+        let _target_stats = hm.get(&event.target).unwrap();
+        writer.send(DealDamage {
+            source: event.source,
+            target: event.target,
+            name: source_stats.1.to_string(),
+            amount: 1,
+        });
     }
 }
 
@@ -42,19 +40,30 @@ pub fn deal_damage(
     mut commands: Commands,
     mut reader: EventReader<DealDamage>,
     mut messages: ResMut<Messages>,
-    mut query: Query<(Entity, &mut Stats)>,
+    mut query: Query<(Entity, &mut Stats, &Name)>,
+    player_entity: Res<Entity>,
 ) {
+    let mut hm = HashMap::new();
     for event in reader.iter() {
-        for (entity, mut stats) in query.iter_mut() {
-            if event.entity == entity {
-                stats.hp.cur -= event.amount;
-                messages.add(format!("You hit the rat for {} points", event.amount));
-            }
+        hm.insert(event.target, (event.source, event.amount, &event.name));
+    }
 
-            if stats.hp.cur < 0 {
-                commands.entity(entity).despawn();
-                messages.add("You killed it!");
+    for (entity, mut stats, name) in query.iter_mut() {
+        if let Some(found) = hm.get(&entity) {
+            stats.hp.cur -= found.1;
+            if found.0 == *player_entity {
+                messages.add(format!("You hit {} for {} points", name.name, found.1));
+            } else {
+                messages.add(format!(
+                    "{} hits {} for {} points",
+                    found.2, name.name, found.1
+                ));
             }
+        }
+
+        if stats.hp.cur < 0 {
+            commands.entity(entity).despawn();
+            messages.add("You killed it!");
         }
     }
 }
