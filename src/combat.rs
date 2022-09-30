@@ -4,6 +4,7 @@ use bevy_ecs::prelude::*;
 
 use crate::components::*;
 use crate::keyboard::*;
+use crate::map::*;
 use crate::messages::*;
 
 pub struct DealDamage {
@@ -40,7 +41,8 @@ pub fn deal_damage(
     mut commands: Commands,
     mut reader: EventReader<DealDamage>,
     mut messages: ResMut<Messages>,
-    mut query: Query<(Entity, &mut Stats, &Name)>,
+    mut query: Query<(Entity, &mut Stats, &Name, &Position)>,
+    mut map: ResMut<Map>,
     player_entity: Res<Entity>,
 ) {
     let mut hm = HashMap::new();
@@ -48,7 +50,7 @@ pub fn deal_damage(
         hm.insert(event.target, (event.source, event.amount, &event.name));
     }
 
-    for (entity, mut stats, name) in query.iter_mut() {
+    for (entity, mut stats, name, pos) in query.iter_mut() {
         if let Some(found) = hm.get(&entity) {
             stats.hp.cur -= found.1;
             if found.0 == *player_entity {
@@ -62,6 +64,7 @@ pub fn deal_damage(
         }
 
         if stats.hp.cur < 0 {
+            map.remove_entity(&entity, pos);
             commands.entity(entity).despawn();
             messages.add("You killed it!");
         }

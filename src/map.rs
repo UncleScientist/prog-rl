@@ -232,6 +232,17 @@ impl Map {
         self.entity[idx].push(id);
     }
 
+    pub fn remove_entity(&mut self, entity: &Entity, pos: &Position) {
+        let idx = self.pos_to_idx(pos);
+        for e in &self.entity[idx] {
+            if e == entity {
+                self.entity[idx].retain(|x| x != entity);
+                return;
+            }
+        }
+        panic!("tried to remove an entity which is not in the location specified");
+    }
+
     pub fn move_entity(&mut self, old_pos: &Position, new_pos: &Position, id: Entity) {
         let old = self.pos_to_idx(old_pos);
         let new = self.pos_to_idx(new_pos);
