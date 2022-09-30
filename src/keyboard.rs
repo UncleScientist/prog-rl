@@ -32,39 +32,35 @@ pub fn handle_key(
             let mut new_position = *position;
             match event.0 {
                 VirtualKeyCode::Numpad4 | VirtualKeyCode::H => {
-                    new_position.x -= 1;
+                    new_position = map.new_position(Direction::West, &position);
                     action_performed = true;
                 }
                 VirtualKeyCode::Numpad6 | VirtualKeyCode::L => {
-                    new_position.x += 1;
+                    new_position = map.new_position(Direction::East, &position);
                     action_performed = true;
                 }
                 VirtualKeyCode::Numpad2 | VirtualKeyCode::J => {
-                    new_position.y += 1;
+                    new_position = map.new_position(Direction::South, &position);
                     action_performed = true;
                 }
                 VirtualKeyCode::Numpad8 | VirtualKeyCode::K => {
-                    new_position.y -= 1;
+                    new_position = map.new_position(Direction::North, &position);
                     action_performed = true;
                 }
                 VirtualKeyCode::Numpad7 | VirtualKeyCode::Y => {
-                    new_position.x -= 1;
-                    new_position.y -= 1;
+                    new_position = map.new_position(Direction::NorthWest, &position);
                     action_performed = true;
                 }
                 VirtualKeyCode::Numpad9 | VirtualKeyCode::U => {
-                    new_position.x += 1;
-                    new_position.y -= 1;
+                    new_position = map.new_position(Direction::NorthEast, &position);
                     action_performed = true;
                 }
                 VirtualKeyCode::Numpad1 | VirtualKeyCode::B => {
-                    new_position.x -= 1;
-                    new_position.y += 1;
+                    new_position = map.new_position(Direction::SouthWest, &position);
                     action_performed = true;
                 }
                 VirtualKeyCode::Numpad3 | VirtualKeyCode::N => {
-                    new_position.x += 1;
-                    new_position.y += 1;
+                    new_position = map.new_position(Direction::SouthEast, &position);
                     action_performed = true;
                 }
                 VirtualKeyCode::Space => {

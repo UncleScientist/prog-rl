@@ -14,6 +14,17 @@ pub struct Map {
     start_y: i32,
 }
 
+pub enum Direction {
+    North,
+    South,
+    East,
+    West,
+    NorthWest,
+    NorthEast,
+    SouthWest,
+    SouthEast,
+}
+
 #[derive(Copy, Clone, PartialEq)]
 pub enum TileType {
     Floor,
@@ -177,6 +188,43 @@ impl Map {
             start_x,
             start_y,
         }
+    }
+
+    pub fn new_position(&self, dir: Direction, old_position: &Position) -> Position {
+        let mut newpos = *old_position;
+
+        match dir {
+            Direction::North => {
+                newpos.y = 0.max(newpos.y - 1);
+            }
+            Direction::South => {
+                newpos.y = (self.height - 1).min(newpos.y + 1);
+            }
+            Direction::East => {
+                newpos.x = (self.width - 1).min(newpos.x + 1);
+            }
+            Direction::West => {
+                newpos.x = 0.max(newpos.x - 1);
+            }
+            Direction::NorthWest => {
+                newpos.y = 0.max(newpos.y - 1);
+                newpos.x = 0.max(newpos.x - 1);
+            }
+            Direction::NorthEast => {
+                newpos.y = 0.max(newpos.y - 1);
+                newpos.x = (self.width - 1).min(newpos.x + 1);
+            }
+            Direction::SouthWest => {
+                newpos.y = (self.height - 1).min(newpos.y + 1);
+                newpos.x = 0.max(newpos.x - 1);
+            }
+            Direction::SouthEast => {
+                newpos.y = (self.height - 1).min(newpos.y + 1);
+                newpos.x = (self.width - 1).min(newpos.x + 1);
+            }
+        }
+
+        newpos
     }
 
     pub fn add_entity(&mut self, p: &Position, id: Entity) {
